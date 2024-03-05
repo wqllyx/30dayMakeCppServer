@@ -1,8 +1,13 @@
 #include<sys/socket.h>
+#include<sys/types.h>
 #include<arpa/inet.h>  //这个头文件包含了<netinet/in.h>，不用再次包含了
 #include<cstring>
 #include<cstdio>
 #include "util.h"
+#include <unistd.h>
+#include<iostream>
+using std::cout,std::endl;
+
 int main(){
     struct sockaddr_in serv_addr;//socket所在服务器的地址(由ip地址和端口号标识)
 
@@ -27,6 +32,26 @@ int main(){
     int clnt_sockfd = accept(sockfd, (sockaddr*)&clnt_addr, &clnt_addr_len);
     errorif(clnt_sockfd == -1, "socket accept");
     printf("new client fd %d! IP: %s Port: %d\n", clnt_sockfd, inet_ntoa(clnt_addr.sin_addr), ntohs(clnt_addr.sin_port));
+
+    while (1)
+    {
+        char buffer[1024];
+        bzero(buffer,sizeof(buffer));
+        ssize_t Nrecv = recv(clnt_sockfd, buffer, sizeof(buffer), 0);
+        if (Nrecv > 0){
+            cout << "客户端socket" << clnt_sockfd << "发送信息：" << buffer << endl;
+            send(clnt_sockfd, buffer, Nrecv, 0);           //将相同的数据写回到客户端
+        }
+        else if (Nrecv == 0){
+            cout << "客户端socket" << clnt_sockfd << "关闭" << endl;
+            close(clnt_sockfd);
+            break;
+        }
+        else{
+            close(clnt_sockfd);
+            errorif(true, "socket read error");
+        }
+    }
      
 
 
