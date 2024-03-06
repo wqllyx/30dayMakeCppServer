@@ -6,12 +6,20 @@
 #include "util.h"
 #include <unistd.h>
 #include<iostream>
+#include <sys/epoll.h>
+#include <fcntl.h>
 using std::cout,std::endl;
+#define MAX_EVENTS 10
+#define READ_BUFFER 1024
+void setnonblocking(int fd){
+    int old_option = fcntl(fd,F_GETFL);/*获取文件描述符旧的状态标志*/
+    int new_option = old_option| O_NONBLOCK;/*设置非阻塞标志*/
+    fcntl(fd, F_SETFL, new_option);
+}
 
 int main(){
     struct sockaddr_in serv_addr;//socket所在服务器的地址(由ip地址和端口号标识)
-
-
+    struct epoll_event ev, events[MAX_EVENTS];
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     errorif(sockfd == -1, "socket 创建");
     
@@ -26,33 +34,59 @@ int main(){
     errorif(bind(sockfd, (sockaddr*)&serv_addr, sizeof(serv_addr)) == -1, "bind"); // 将socket所在主机得网络地址与文件描述符绑定。
     errorif(listen(sockfd, SOMAXCONN) == -1, "listen"); // 监听套接字端口。处理来自客户端的请求。
 
+
+    int epollfd = epoll_create1(0);
+    errorif(epollfd == -1, "epoll create:");
+    ev.events = EPOLLIN;
+    ev.data.fd = sockfd;
+    errorif(epoll_ctl(epollfd, EPOLL_CTL_ADD, sockfd, &ev) == -1, "epoll_ctl:");
     struct sockaddr_in clnt_addr;
     socklen_t clnt_addr_len = sizeof(clnt_addr);
     bzero(&clnt_addr, sizeof(clnt_addr));
-    int clnt_sockfd = accept(sockfd, (sockaddr*)&clnt_addr, &clnt_addr_len);
-    errorif(clnt_sockfd == -1, "socket accept");
-    printf("new client fd %d! IP: %s Port: %d\n", clnt_sockfd, inet_ntoa(clnt_addr.sin_addr), ntohs(clnt_addr.sin_port));
 
-    while (1)
+
+    for(;;)
     {
-        char buffer[1024];
-        bzero(buffer,sizeof(buffer));
-        ssize_t Nrecv = recv(clnt_sockfd, buffer, sizeof(buffer), 0);
-        if (Nrecv > 0){
-            cout << "客户端socket" << clnt_sockfd << "发送信息：" << buffer << endl;
-            send(clnt_sockfd, buffer, Nrecv, 0);           //将相同的数据写回到客户端
-        }
-        else if (Nrecv == 0){
-            cout << "客户端socket" << clnt_sockfd << "关闭" << endl;
-            close(clnt_sockfd);
-            break;
-        }
-        else{
-            close(clnt_sockfd);
-            errorif(true, "socket read error");
+        int nfds;
+        errorif( (nfds = epoll_wait(epollfd, events, MAX_EVENTS, -1)) == -1, "epoll_wait");
+        for (int n = 0; n < nfds; ++n) {
+            if (events[n].data.fd == sockfd) {
+                int clnt_sockfd;
+                errorif((clnt_sockfd = accept(sockfd, (sockaddr*)&clnt_addr, &clnt_addr_len)) == -1, "accept:");
+                cout <<"new client " << clnt_sockfd << "IP: " << inet_ntoa(clnt_addr.sin_addr) << "Port: " << ntohs(clnt_addr.sin_port) <<endl;
+                setnonblocking(clnt_sockfd);
+                ev.events = EPOLLIN | EPOLLET;
+                ev.data.fd = clnt_sockfd;
+                errorif(epoll_ctl(epollfd, EPOLL_CTL_ADD, clnt_sockfd,&ev), "");
+            } 
+            else if ((events[n].events & EPOLLIN)) {
+                char buffer[READ_BUFFER];
+                for(;;){
+                    bzero(buffer,sizeof(buffer));
+                    ssize_t bytes_read = recv(events[n].data.fd, buffer, sizeof(buffer), 0);
+                    if (bytes_read > 0){
+                        cout << "客户端socket " << events[n].data.fd << "发送信息：" << buffer << endl;
+                        send(events[n].data.fd, buffer, bytes_read, 0);           //将相同的数据写回到客户端
+                    }
+                    else if(bytes_read == -1 && errno == EINTR){  //客户端正常中断、继续读取
+                        cout << "continue reading" << endl;
+                        continue;
+                    }
+                    else if(bytes_read == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK))){//非阻塞IO，这个条件表示数据全部读取完毕
+                        cout <<"finish reading once, errno " << errno << endl;;
+                        break;
+                    }
+                    else if (bytes_read == 0){
+                        cout << "客户端socket " << events[n].data.fd << "关闭" << endl;
+                        close(events[n].data.fd);
+                        break;
+                    }
+                
+                }
+            }
+            else{
+
+            }
         }
     }
-     
-
-
 }
