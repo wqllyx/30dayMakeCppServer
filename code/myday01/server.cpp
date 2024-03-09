@@ -18,33 +18,35 @@ void handleReadEvent(int sockfd);
 int main(){
 
     // 1. 创建Socket
-    Socket *serv_sock = new Socket();
+    Socket *serv_sock = new Socket;
     // 2. 分配socket地址，命名socket
     InetAddress *serv_addr = new InetAddress("127.0.0.1", 8888);
     serv_sock->bind1(serv_addr);
     // 3. 监听socket
     serv_sock->listen1(); 
     // 4. 创建并添加监听socket到epoll事件表。
-    Epoll1 *ep = new Epoll1();   
+    Epoll1 *ep = new Epoll1;   
     serv_sock->setnonblocking(); // 设置非阻塞
-    ep->addFd(serv_sock->getFd(), EPOLLIN | EPOLLET);
-
-
+    Channel *servChannel = new Channel(ep, serv_sock->getFd());
+    servChannel->enableReading();
     for(;;)
     {
-        // 创建事件表
-        std::vector<epoll_event> events = ep->poll(-1);
-        int nfds = events.size();
+        // 创建channel表
+        std::vector<Channel*> activeChannels = ep->poll(-1);
+        int nfds = activeChannels.size();
         for (int n = 0; n < nfds; ++n) {
-            if (events[n].data.fd == serv_sock->getFd()) {
+            // 获得channel关联的fd，判断此fd是服务器监听fd，还是客户端请求fd
+            int chfd = activeChannels[n]->getFd();
+            if (chfd == serv_sock->getFd()) {
                 InetAddress *clnt_addr = new InetAddress();  //会发生内存泄露！没有delete
                 Socket *clnt_sockfd = new Socket(serv_sock->accept1(clnt_addr));  //会发生内存泄露！没有delete
                 cout <<"new client " << clnt_sockfd->getFd() << "IP: " << inet_ntoa(clnt_addr->addr.sin_addr) << "Port: " << ntohs(clnt_addr->addr.sin_port) <<endl;
                 clnt_sockfd->setnonblocking();
-                ep->addFd(clnt_sockfd->getFd(), EPOLLIN | EPOLLET);
+                Channel *clntChannel = new Channel(ep, clnt_sockfd->getFd());
+                clntChannel->enableReading();
             } 
-            else if ((events[n].events & EPOLLIN)) {
-                handleReadEvent(events[n].data.fd);
+            else if ((activeChannels[n]->getRevents() & EPOLLIN)) {
+                handleReadEvent(activeChannels[n]->getFd());
             }
             else{
                 cout << "else"<< endl;

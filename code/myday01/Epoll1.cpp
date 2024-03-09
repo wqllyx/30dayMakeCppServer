@@ -28,12 +28,31 @@ void Epoll1::addFd(int fd, uint32_t op){
 }
 
 /* 返回就绪事件vector */
-std::vector<epoll_event> Epoll1::poll(int timeout){
-    std::vector<epoll_event> activeEvents;
+std::vector<Channel *> Epoll1::poll(int timeout){
+    std::vector<Channel *> activeChannels;
     int nfds = epoll_wait(epfd, events, MAX_EVENTS, timeout);
     errorif(nfds == -1, "epoll wait: ");
     for(int i = 0; i < nfds; ++i){
-        activeEvents.push_back(events[i]);
+        Channel *ch = (Channel*)events[i].data.ptr;
+        ch->setRevents(events[i].events);
+        activeChannels.push_back(ch);
     }
-    return activeEvents;
+    return activeChannels;
+}
+
+/* 将channel对象添加到epoll监听列表 */
+void Epoll1::updateChannel(Channel *channel){
+    int fd = channel->getFd();
+    struct epoll_event ev;
+    bzero(&ev, sizeof(ev));
+    ev.data.ptr = channel;
+    ev.events = channel->getEvents();
+
+    if (channel->getInEpoll()){
+        errorif(epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev) == -1, "epoll modify error");
+    }
+    else{
+        errorif(epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == -1, "epoll add error");
+        channel->setInEpoll();
+    }
 }

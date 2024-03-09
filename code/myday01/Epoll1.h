@@ -2,8 +2,9 @@
 
 #include<sys/epoll.h>
 #include<vector>
-
+#include "Channel.h"
 #define MAX_EVENTS 1000
+class Channel;
 
 class Epoll1
 {
@@ -15,7 +16,8 @@ public:
     ~Epoll1();
 
     void addFd(int fd, uint32_t op);
-    std::vector<epoll_event> poll(int timeout = -1);
+    std::vector<Channel*> poll(int timeout = -1);
+    void updateChannel(Channel*);
 };
 
 
