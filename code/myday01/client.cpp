@@ -3,7 +3,7 @@
 #include<arpa/inet.h>  //这个头文件包含了<netinet/in.h>，不用再次包含了
 #include<cstring>
 #include<cstdio>
-#include "util.h"
+#include "./src/util.h"
 #include<unistd.h>
 #include<iostream>
 using std::cout,std::endl,std::cin;
