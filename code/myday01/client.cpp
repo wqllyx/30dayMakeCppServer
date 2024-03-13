@@ -15,7 +15,7 @@ int main(){
     serv_addr.sin_family = AF_INET;
     // serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
     errorif(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr.s_addr) == -1,"ip地址转换:");
-    serv_addr.sin_port = htons(8888);
+    serv_addr.sin_port = htons(7777);
     errorif(connect(sockfd, (sockaddr*)&serv_addr, sizeof(serv_addr)) == -1, "socket connect");
 
     while (1)

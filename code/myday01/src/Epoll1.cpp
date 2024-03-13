@@ -48,11 +48,12 @@ void Epoll1::updateChannel(Channel *channel){
     ev.data.ptr = channel;
     ev.events = channel->getEvents();
 
-    if (channel->getInEpoll()){
-        errorif(epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev) == -1, "epoll modify error");
-    }
-    else{
+    if(!channel->getInEpoll()){
         errorif(epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == -1, "epoll add error");
         channel->setInEpoll();
+        // debug("Epoll: add Channel to epoll tree success, the Channel's fd is: ", fd);
+    } else{
+        errorif(epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev) == -1, "epoll modify error");
+        // debug("Epoll: modify Channel in epoll tree success, the Channel's fd is: ", fd);
     }
 }

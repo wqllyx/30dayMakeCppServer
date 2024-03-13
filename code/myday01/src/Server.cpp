@@ -8,15 +8,15 @@
 
 #define READ_BUFFER 1024
 
-Server::Server(EventLoop *loop){
+Server::Server(EventLoop *loop) : loop(loop){
     Socket *serv_sock = new Socket();
-    InetAddress *serv_addr = new InetAddress("127.0.0.1", 8888);
+    InetAddress *serv_addr = new InetAddress("127.0.0.1", 7777);
     serv_sock->bind1(serv_addr);
     serv_sock->listen1(); 
     serv_sock->setnonblocking();
 
     Channel *servChannel = new Channel(loop, serv_sock->getFd());
-    std::function<void()> cb = std::bind(&Server::newConnection, this, serv_sock);
+    std::function<void()> cb = std::bind(&Server::handleNewConnection, this, serv_sock);
     servChannel->setCallback(cb);
     servChannel->enableReading();
 }
@@ -51,7 +51,7 @@ void Server::handleReadEvent(int sockfd){
     }
 }
 
-void Server::newConnection(Socket *serv_sock){
+void Server::handleNewConnection(Socket *serv_sock){
     InetAddress *clnt_addr = new InetAddress();  //会发生内存泄露！没有delete
     Socket *clnt_sockfd = new Socket(serv_sock->accept1(clnt_addr));  //会发生内存泄露！没有delete
     cout <<"new client " << clnt_sockfd->getFd() << "IP: " << inet_ntoa(clnt_addr->addr.sin_addr) << "Port: " << ntohs(clnt_addr->addr.sin_port) <<endl;

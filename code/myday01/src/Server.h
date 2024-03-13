@@ -11,5 +11,5 @@ public:
     ~Server();
 
     void handleReadEvent(int);
-    void newConnection(Socket *serv_sock);
+    void handleNewConnection(Socket *serv_sock);
 };

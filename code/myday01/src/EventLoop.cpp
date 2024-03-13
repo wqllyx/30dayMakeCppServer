@@ -2,7 +2,6 @@
 #include "Epoll1.h"
 #include "Channel.h"
 #include <vector>
-
 EventLoop::EventLoop() : ep(nullptr), quit(false){
     ep = new Epoll1;
 }
@@ -15,7 +14,7 @@ EventLoop::~EventLoop()
 
 void EventLoop::loop(){
     while(!quit){
-    std::vector<Channel*> chs;
+        std::vector<Channel*> chs;
         chs = ep->poll();
         for(auto it = chs.begin(); it != chs.end(); ++it){
             (*it)->handleEvent();

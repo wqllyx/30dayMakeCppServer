@@ -10,7 +10,6 @@ void Channel::handleEvent(){
 
 void Channel::enableReading(){
     events = EPOLLIN | EPOLLET;
-    
     loop->updateChannel(this);
 }
 
