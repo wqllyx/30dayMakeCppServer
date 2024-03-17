@@ -1,65 +1,35 @@
 #include "Server.h"
 #include "Socket.h"
-#include "InetAddress.h"
-#include "Channel.h"
+#include "Acceptor.h"
+#include "Connection.h"
 #include <functional>
-#include <string.h>
-#include <unistd.h>
-
 #define READ_BUFFER 1024
 
-Server::Server(EventLoop *loop) : loop(loop){
-    Socket *serv_sock = new Socket();
-    InetAddress *serv_addr = new InetAddress("127.0.0.1", 7777);
-    serv_sock->bind1(serv_addr);
-    serv_sock->listen1(); 
-    serv_sock->setnonblocking();
-
-    Channel *servChannel = new Channel(loop, serv_sock->getFd());
-    std::function<void()> cb = std::bind(&Server::handleNewConnection, this, serv_sock);
-    servChannel->setCallback(cb);
-    servChannel->enableReading();
+Server::Server(EventLoop *loop) : loop(loop), acceptor(nullptr)
+{
+    // acceptor:服务器启动时创建，目前只有一个实例，负责：建立服务器服务socket地址（ip，port）、接受新的客户端连接。
+    acceptor = new Acceptor(loop);
+    // 设置新链接的回调函数，用于处理连接事件。（NewConnectionCallback）
+    std::function<void(Socket *)> cb = std::bind(&Server::handleNewConnection, this, std::placeholders::_1);
+    acceptor->setNewConnectionCallback(cb);
 }
 
-Server::~Server(){
-
+Server::~Server()
+{
+    delete acceptor;
 }
 
-void Server::handleReadEvent(int sockfd){
-    char buffer[READ_BUFFER];
-    for(;;){
-        bzero(buffer,sizeof(buffer));
-        ssize_t bytes_read = recv(sockfd, buffer, sizeof(buffer), 0);
-        if (bytes_read > 0){
-            cout << "客户端socket " << sockfd << "发送信息：" << buffer << endl;
-            send(sockfd, buffer, bytes_read, 0);           //将相同的数据写回到客户端
-        }
-        else if(bytes_read == -1 && errno == EINTR){  //客户端正常中断、继续读取
-            cout << "continue reading" << endl;
-            continue;
-        }
-        else if(bytes_read == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK))){//非阻塞IO，这个条件表示数据全部读取完毕
-            cout <<"finish reading once, errno " << errno << endl;;
-            break;
-        }
-        else if (bytes_read == 0){
-            cout << "客户端socket " << sockfd << "关闭" << endl;
-            close(sockfd);
-            break;
-        }
-    
-    }
+void Server::handleNewConnection(Socket *sock)
+{
+    Connection *conn = new Connection(loop, sock);
+    std::function<void(Socket *)> cb = std::bind(&Server::deleteConnection, this, std::placeholders::_1);
+    conn->setDeleteConnectionCallback(cb);
+    connections[sock->getFd()] = conn;
 }
 
-void Server::handleNewConnection(Socket *serv_sock){
-    InetAddress *clnt_addr = new InetAddress();  //会发生内存泄露！没有delete
-    Socket *clnt_sockfd = new Socket(serv_sock->accept1(clnt_addr));  //会发生内存泄露！没有delete
-    cout <<"new client " << clnt_sockfd->getFd() << "IP: " << inet_ntoa(clnt_addr->addr.sin_addr) << "Port: " << ntohs(clnt_addr->addr.sin_port) <<endl;
-    clnt_sockfd->setnonblocking();
-    Channel *clntChannel = new Channel(loop, clnt_sockfd->getFd());
-    std::function<void()> cb = std::bind(&Server::handleReadEvent, this, clnt_sockfd->getFd());
-    clntChannel->setCallback(cb);
-    clntChannel->enableReading();
+void Server::deleteConnection(Socket *sock)
+{
+    Connection *conn = connections[sock->getFd()];
+    connections.erase(sock->getFd());
+    delete conn;
 }
-
-
