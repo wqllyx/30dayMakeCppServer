@@ -5,6 +5,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include<cstring>
 Socket::Socket() : fd(-1){
     errorif( (fd = socket(AF_INET, SOCK_STREAM, 0)) ==-1, "socket: ");
 }
@@ -20,8 +22,11 @@ Socket::~Socket(){
     }
 }
 
-void Socket::bind1(InetAddress *addr){
-    errorif(::bind(fd, (sockaddr*)&addr->addr, addr->addr_len) == -1, "bind1: ");
+void Socket::bind1(InetAddress *_addr){
+    struct sockaddr_in addr = _addr->getAddr();
+    socklen_t addr_len = _addr->getAddr_len();
+    errorif(::bind(fd, (sockaddr *)&addr, addr_len) == -1, "socket bind error");
+    _addr->setInetAddr(addr, addr_len);
 }
 
 void Socket::listen1(){
@@ -37,9 +42,13 @@ int Socket::setnonblocking(){
 }
 
 /* 返回客户端socket */
-int Socket::accept1(InetAddress *addr){
-    int clnt_sockfd = ::accept(fd, (sockaddr*)&addr->addr, &addr->addr_len);
-    errorif(clnt_sockfd == -1, "accept1: ");
+int Socket::accept1(InetAddress *_addr){
+    struct sockaddr_in addr;
+    socklen_t addr_len = sizeof(addr);
+    bzero(&addr, sizeof(addr));
+    int clnt_sockfd = ::accept(fd, (sockaddr *)&addr, &addr_len);
+    errorif(clnt_sockfd == -1, "socket accept error");
+    _addr->setInetAddr(addr, addr_len);
     return clnt_sockfd;
 }
 

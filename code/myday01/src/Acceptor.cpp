@@ -25,7 +25,12 @@ Acceptor::~Acceptor(){
 }
 
 void Acceptor::acceptConnection(){
-    newConnectionCallback(sock);
+    InetAddress *clnt_addr = new InetAddress();
+    Socket *clnt_sock = new Socket(sock->accept1(clnt_addr));
+    cout << "new client fd: " << clnt_sock->getFd() << "ip: " << inet_ntoa(clnt_addr->getAddr().sin_addr) << "port: " << ntohs(clnt_addr->getAddr().sin_port)<<endl;
+    clnt_sock->setnonblocking();
+    newConnectionCallback(clnt_sock);
+    delete clnt_addr;
 }
 
 void Acceptor::setNewConnectionCallback(std::function<void(Socket*)> call_back){
