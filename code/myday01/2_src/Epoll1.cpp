@@ -1,5 +1,5 @@
-#include "Epoll1.h"
-#include "util.h"
+#include "Epoll1.hpp"
+#include "util.hpp"
 #include <unistd.h>
 #include <cstring>
 
@@ -51,7 +51,6 @@ void Epoll1::updateChannel(Channel *channel){
     ev.events = channel->getEvents();
 
     if(!channel->getInEpoll()){
-        // epoll添加事件到内核的监听事件表
         errorif(epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == -1, "epoll add error");
         channel->setInEpoll();
         // debug("Epoll: add Channel to epoll tree success, the Channel's fd is: ", fd);

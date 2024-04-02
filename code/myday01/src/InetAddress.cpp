@@ -1,6 +1,7 @@
 #include "InetAddress.h"
 #include<cstring>
-
+#include <iostream>
+using std::cout, std::endl;
 InetAddress::InetAddress() : addr_len(sizeof(addr)) {
     bzero(&addr, addr_len);
 }

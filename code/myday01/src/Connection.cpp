@@ -1,6 +1,8 @@
 #include "Connection.h"
 #include "Socket.h"
+#include "util.h"
 #include "Channel.h"
+#include "Buffer.h"
 #include <unistd.h>
 #include <cstring>
 #include<iostream>
@@ -9,12 +11,13 @@
 using namespace std;
 #define READ_BUFFER 1024
 
-Connection::Connection(EventLoop *_loop, Socket *_sock) : loop(_loop), sock(_sock), channel(nullptr)
+Connection::Connection(EventLoop *_loop, Socket *_sock) : loop(_loop), sock(_sock), channel(nullptr), readBuffer(nullptr)
 {
     channel = new Channel(loop, sock->getFd());
     std::function<void()> cb = std::bind(&Connection::echo, this, sock->getFd());
     channel->setCallback(cb);
     channel->enableReading();
+    readBuffer = new Buffer();
 }
 
 Connection::~Connection()
@@ -32,8 +35,7 @@ void Connection::echo(int sockfd)
         ssize_t bytes_read = recv(sockfd, buffer, sizeof(buffer), 0);
         if (bytes_read > 0)
         {
-            cout << "客户端socket " << sockfd << "发送信息：" << buffer << endl;
-            send(sockfd, buffer, bytes_read, 0); // 将相同的数据写回到客户端
+            readBuffer->append(buffer, bytes_read);
         }
         else if (bytes_read == -1 && errno == EINTR)
         { // 客户端正常中断、继续读取
@@ -43,13 +45,15 @@ void Connection::echo(int sockfd)
         else if (bytes_read == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK)))
         { // 非阻塞IO，这个条件表示数据全部读取完毕
             cout << "finish reading once, errno " << errno << endl;
-            ;
+            errorif(send(sockfd, readBuffer->c_str(), readBuffer->size(),0) == -1, "socket write error");
+            readBuffer->clear();
             break;
         }
         else if (bytes_read == 0)
         {
             cout << "客户端socket " << sockfd << "关闭" << endl;
-            close(sockfd);
+            // close(sockfd); //关闭socket会自动将文件描述符从epoll树上移除
+            deleteConnectionCallback(sock);
             break;
         }
     }

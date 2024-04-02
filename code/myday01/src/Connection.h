@@ -1,15 +1,18 @@
 #pragma once
 #include <functional>
-
+#include <string>
 class EventLoop;
 class Socket;
 class Channel;
+class Buffer;
 class Connection
 {
 private:
     EventLoop *loop;
     Socket *sock;
     Channel *channel;
+    Buffer *readBuffer;
+    std::string *inBuffer;
     std::function<void(Socket *)> deleteConnectionCallback;
 
 public:

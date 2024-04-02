@@ -9,7 +9,7 @@ Server::Server(EventLoop *loop) : loop(loop), acceptor(nullptr)
 {
     // acceptor:服务器启动时创建，目前只有一个实例，负责：建立服务器服务socket地址（ip，port）、接受新的客户端连接。
     acceptor = new Acceptor(loop);
-    // 设置新链接的回调函数，用于处理连接事件。（NewConnectionCallback）
+    // 设置Acceptor的回调函数用于：处理新连接。（NewConnectionCallback）
     std::function<void(Socket *)> cb = std::bind(&Server::handleNewConnection, this, std::placeholders::_1);
     acceptor->setNewConnectionCallback(cb);
 }

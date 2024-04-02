@@ -1,6 +1,6 @@
-#include "EventLoop.h"
-#include "Epoll1.h"
-#include "Channel.h"
+#include "EventLoop.hpp"
+#include "Epoll1.hpp"
+#include "Channel.hpp"
 #include <vector>
 EventLoop::EventLoop() : ep(nullptr), quit(false){
     ep = new Epoll1;
@@ -19,10 +19,7 @@ void EventLoop::loop(){
         chs = ep->poll();
         // 循环处理接收到的就绪事件。
         for(auto it = chs.begin(); it != chs.end(); ++it){
-            // 此处会调用相应的回调函数：
-            // 1.如果第一次走到这个循环，就只有一个fd上有事件发生（服务器上监听套接字的新客户端连接事件）：他的回调函数第一次绑定到std::function<void()> cb = std::bind(&Acceptor::acceptConnection, this);
-            // acceptChannel->setCallback(cb);在aceptconnection之中，会设置acceptor的回调函数为
-            // 2.如果是第二次走到这个循环（）：那就按情况处理。
+            // 此处会调用相应的回调函数如果第一次连接，回调函数绑定到server的handlenewconnection()函数，
             // 在此函数中，会将handleevent绑定到IO读写函数handlereadevent（）
             (*it)->handleEvent();
         }
